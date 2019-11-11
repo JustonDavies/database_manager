@@ -1,0 +1,61 @@
+#-- Build base image ---------------------------------------------------------------------------------------------------
+FROM golang:1.14-alpine AS depenency_solving_environment
+
+# Use unicode
+ENV LANG=C.UTF-8
+
+# Download Git, Bash and OpenSSH
+RUN apk add --no-cache git bash
+
+# Set working directory
+ARG WORKING_DIRECTORY=/opt/src/project
+WORKDIR ${WORKING_DIRECTORY}
+
+# Set environment
+ARG GO111MODULE=off
+
+# Download/Build Terraform
+RUN go get -u -t github.com/volatiletech/sqlboiler
+RUN go get github.com/volatiletech/sqlboiler/drivers/sqlboiler-psql
+
+#-- Build container ----------------------------------------------------------------------------------------------------
+FROM depenency_solving_environment AS run_environment
+
+# Copy relevant project code
+
+# Initialize / begin interactive environment
+ENV PSQL_HOST=default_host
+ENV PSQL_PORT=5432
+ENV PSQL_DBNAME=default_database_name
+ENV PSQL_SCHEMA=public
+ENV PSQL_SSLMODE=require
+
+ENV PSQL_USER=default_user
+ENV PSQL_PASS=default_password
+
+ENTRYPOINT echo "Manufacturizing of ${TARGET} is in progress..."                     && \
+           echo $'\n\
+[psql] \n\
+  blacklist = ["schema_migrations"] \n\
+[[types]] \n\
+  [types.match] \n\
+    db_type = "uuid" \n\
+    nullable = false \n\
+  [types.replace] \n\
+    type = "uuid.UUID" \n\
+  [types.imports]\n\
+    third_party = [\'"github.com/gofrs/uuid"\'] \n\
+[[types]] \n\
+  [types.match] \n\
+    db_type = "uuid" \n\
+    nullable = true \n\
+  [types.replace] \n\
+    type = "uuid.NullUUID" \n\
+  [types.imports]\n\
+    third_party = [\'"github.com/gofrs/uuid"\'] \n\
+' | tee sqlboiler.toml  && \
+           sqlboiler                                                                    \
+           --wipe                                                                       \
+           --pkgname models                                                             \
+           --no-hooks --no-auto-timestamps --no-tests                                   \
+           --output /output/boil psql

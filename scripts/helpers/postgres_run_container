@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+#-- Requirements ---------------------------------------------------------------------------------------------------------------
+command -v jq >/dev/null 2>&2 || {
+  echo >&2 "jq is required but is not available, aborting..."
+  exit 1
+}
+command -v docker >/dev/null 2>&2 || {
+  echo >&2 "docker is required but is not available, aborting..."
+  exit 1
+}
+
+#-- Imported Variables ---------------------------------------------------------------------------------------------------------
+project_name=$(cat < ./scripts/scripts_configuration.json | jq -r '.project_name')
+project_owner=$(cat < ./scripts/scripts_configuration.json | jq -r '.project_owner')
+
+target=$1
+if [ -z "${target}" ]; then ls config/secrets && read -rp "Which environment would you like to target? Type your full answer here and press enter: " target; fi
+
+network_name=$(cat <"./config/secrets/${target}/script_secrets.json" | jq -r '.secrets.network_name')
+
+database_name=$(cat <"./config/secrets/${target}/script_secrets.json" | jq -r '.secrets.database_name')
+database_user=$(cat <"./config/secrets/${target}/script_secrets.json" | jq -r '.secrets.database_user')
+database_schema=$(cat <"./config/secrets/${target}/script_secrets.json" | jq -r '.secrets.database_schema')
+database_password=$(cat <"./config/secrets/${target}/script_secrets.json" | jq -r '.secrets.database_password')
+
+published_local_port=$(cat <"./config/secrets/${target}/script_secrets.json" | jq -r '.secrets.published_local_port')
+
+#-- Assume image exists --------------------------------------------------------------------------------------------------------
+image_tag="postgres"
+
+#-- Ensure container for ephemeral use -----------------------------------------------------------------------------------------
+container_name="${project_owner}_${project_name}_ephemeral_${database_schema}_postgres"
+container_state=$(sudo docker container inspect --format='{{.State.Status}}' "${container_name}" 2>/dev/null)
+
+if [ -n "${container_state}" ] && [ "${container_state}" != "running" ]; then
+  echo "Container is '${container_state}' starting..."
+  if [ "${container_state}" == "exited" ]; then
+    sudo docker container start "${container_name}"
+    sleep 2
+  elif [ "${container_state}" == "paused" ]; then
+    sudo docker container unpause "${container_name}"
+    sleep 2
+  fi
+elif [ -z "${container_state}" ]; then
+  echo "Container ${container_name} does not exist, creating..."
+  sudo docker run \
+    --name "${container_name}" \
+    --network "${network_name}" \
+    --env POSTGRES_DB="${database_name}" \
+    --env POSTGRES_USER="${database_user}" \
+    --env POSTGRES_PASSWORD="${database_password}" \
+    --publish "${published_local_port}":5432 \
+    --detach \
+    "${image_tag}" postgres -c log_statement=all
+  sleep 2
+fi

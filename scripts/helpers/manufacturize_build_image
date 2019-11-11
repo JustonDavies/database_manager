@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#-- Requirements ---------------------------------------------------------------------------------------------------------------
+command -v jq     >/dev/null 2>&2 || { echo >&2 "jq is required but is not available, aborting...";     exit 1; }
+command -v docker >/dev/null 2>&2 || { echo >&2 "docker is required but is not available, aborting..."; exit 1; }
+
+#-- Imported Variables ---------------------------------------------------------------------------------------------------------
+project_name=$(cat < ./scripts/scripts_configuration.json | jq -r '.project_name')
+project_owner=$(cat < ./scripts/scripts_configuration.json | jq -r '.project_owner')
+
+#-- Create container for ephemeral use -----------------------------------------------------------------------------------------
+image_tag="${project_owner}/${project_name}_manufacturize"
+sudo docker build                                                             \
+  --file dockerfiles/manufacturize.docker                                     \
+  --tag "${image_tag}"                                                        \
+  ./

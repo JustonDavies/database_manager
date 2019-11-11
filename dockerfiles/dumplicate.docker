@@ -1,0 +1,37 @@
+#-- Build base image -----------------------------------------------------------------------------------------------------------
+FROM debian:testing AS depenency_solving_environment
+
+# Set timezone to UTC by default
+RUN ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
+
+# Use unicode
+ENV LANG=C.UTF-8
+
+# Install tools
+RUN apt-get update
+RUN apt-get install --silent --yes postgresql
+
+#-- Build container ------------------------------------------------------------------------------------------------------------
+FROM depenency_solving_environment AS dump_context
+
+# Setup environment
+ENV TARGET=default_target
+ENV DATABASE_URL=default_url
+ENV DATABASE_PORT=default_port
+ENV DATABASE_NAME=default_name
+ENV DATABASE_USER=default_user
+ENV DATABASE_PASSWORD=default_password
+ENV DATABASE_SSL_MODE=require
+
+ENTRYPOINT echo "Dumplification of ${TARGET} is in progress..." && \
+           PGPASSWORD="${DATABASE_PASSWORD}"                       \
+           PGSSLMODE="${DATABASE_SSL_MODE}"                        \
+           /usr/bin/pg_dump                                        \
+             --host="${DATABASE_URL}"                              \
+             --port="${DATABASE_PORT}"                             \
+             --dbname="${DATABASE_NAME}"                           \
+             --username="${DATABASE_USER}"                         \
+             --file="/dumps/${TARGET}-$(date +%s)-dump.sql"        \
+             --format=p                                            \
+             --data-only                                           \
+             --column-inserts                                      

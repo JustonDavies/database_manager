@@ -1,0 +1,20 @@
+# -- Ignore IDE configuration files ----------
+.idea/
+
+# -- Ignore vendored modules ----------
+vendor/
+
+# -- Ignore build artifacts ----------
+build/*
+!build/.keep
+
+# -- Ignore test data ----------
+test/*
+!test/.keep
+
+# -- Ignore secrets ----------
+config/secrets
+
+# -- Ignore tmp ----------
+tmp/*
+!tmp/.keep
